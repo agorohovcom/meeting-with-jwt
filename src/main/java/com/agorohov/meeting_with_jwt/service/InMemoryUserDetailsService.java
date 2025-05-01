@@ -36,7 +36,7 @@ public class InMemoryUserDetailsService implements UserDetailsService {
         UserDetails user = User.builder()
                 .username(dto.getUsername())
                 .password(passwordEncoder.encode(dto.getPassword()))
-                .roles(dto.getRoles().toArray(new String[0]))
+                .roles(dto.getRoles().getFirst())
                 .build();
 
         users.put(dto.getUsername(), user);
