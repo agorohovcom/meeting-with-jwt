@@ -8,14 +8,13 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class InMemoryUserDetailsService implements UserDetailsService {
 
-    // TODO может тут конкаррентхешмап?
-    private final Map<String, UserDetails> users = new HashMap<>();
+    private final Map<String, UserDetails> users = new ConcurrentHashMap<>();
 
     // Конструктор для добавления юзеров в память
     public InMemoryUserDetailsService() {
