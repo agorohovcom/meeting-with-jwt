@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,8 +40,9 @@ public class JwtUtils {
     }
 
     // Извлечь срок жизни токена
-    public Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
+    public Instant extractExpiration(String token) {
+        Date expirationDate = extractClaim(token, Claims::getExpiration);
+        return expirationDate.toInstant();
     }
 
     // Общий метод для извлечения данных
@@ -51,7 +53,7 @@ public class JwtUtils {
 
     // Проверить, истекло ли время действия токена
     private Boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        return extractExpiration(token).isBefore(Instant.now());
     }
 
     // Сгенерировать токен для пользователя
@@ -74,7 +76,8 @@ public class JwtUtils {
     // Валидация токена
     public boolean validateToken(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+        return (username.equals(userDetails.getUsername())
+                && !isTokenExpired(token));
     }
 
     // Парсинг токена

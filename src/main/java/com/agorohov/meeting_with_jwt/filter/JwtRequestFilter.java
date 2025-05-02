@@ -35,6 +35,15 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             @NonNull FilterChain chain)
             throws ServletException, IOException {
 
+        String path = request.getRequestURI();
+        log.info("Processing request to: {}", path);
+
+        // Пропустить фильтр только для эндпоинтов авторизации, но не для логина
+        if (path.startsWith("/api/v1/auth/login") || path.startsWith("/api/v1/auth/register")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
         final String authHeader = request.getHeader("Authorization");
 
         // Извлекаем токен из заголовка
@@ -71,6 +80,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
             } catch (Exception e) {
                 log.error("JWT Error: {}", e.getMessage());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Invalid token");
+                return;
             }
         }
 

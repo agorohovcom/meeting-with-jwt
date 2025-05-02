@@ -8,10 +8,14 @@ import com.agorohov.meeting_with_jwt.service.InMemoryUserDetailsService;
 import com.agorohov.meeting_with_jwt.service.JwtTokenBlacklistService;
 import com.agorohov.meeting_with_jwt.util.JwtUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,6 +28,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
@@ -32,28 +37,32 @@ public class AuthController {
     private final JwtUtils jwtUtils;
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody AuthenticationRequest authenticationRequest) {
+    public ResponseEntity<?> login(@RequestBody AuthenticationRequest request) {
+        log.info("Login attempt: username={}, password={}", request.getUsername(), request.getPassword());
+
         try {
-            authenticationManager.authenticate(
+            Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
-                            authenticationRequest.getUsername(),
-                            authenticationRequest.getPassword()
+                            request.getUsername(),
+                            request.getPassword()
                     )
             );
+
+            String jwt = jwtUtils.generateToken((UserDetails) authentication.getPrincipal());
+            return ResponseEntity.ok(new AuthenticationResponse(jwt));
         } catch (BadCredentialsException e) {
-            throw new RuntimeException("Incorrect login/password", e);
+            String msg = String.format("Authentication failed for %s", request.getUsername());
+            log.error(msg);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(msg);
         }
-
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(authenticationRequest.getUsername());
-        final String jwt = jwtUtils.generateToken(userDetails);
-
-        return ResponseEntity.ok(new AuthenticationResponse(jwt));
     }
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest registerRequest) {
         if (userDetailsService.userExists(registerRequest.getUsername())) {
-            throw new RuntimeException("Username already exists");
+            String msg = String.format("Username already exists: %s", registerRequest.getUsername());
+            log.error(msg);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(msg);
         }
 
         UserDto dto = new UserDto(registerRequest.getUsername(), registerRequest.getPassword(), List.of("USER"));
@@ -67,9 +76,10 @@ public class AuthController {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             blacklistService.blacklistToken(token);
+            SecurityContextHolder.clearContext();
         }
         return ResponseEntity.ok("Logged out successfully");
     }
 
-    // TODO что такое /refresh, /logout, /me, 2FA
+    // TODO что такое /refresh, /me, 2FA
 }

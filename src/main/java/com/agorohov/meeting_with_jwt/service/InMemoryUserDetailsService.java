@@ -2,6 +2,7 @@ package com.agorohov.meeting_with_jwt.service;
 
 import com.agorohov.meeting_with_jwt.dto.UserDto;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -14,11 +15,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class InMemoryUserDetailsService implements UserDetailsService {
 
-    private final PasswordEncoder passwordEncoder;
-
     private final Map<String, UserDetails> users = new ConcurrentHashMap<>();
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
@@ -26,17 +27,19 @@ public class InMemoryUserDetailsService implements UserDetailsService {
         if (user == null) {
             throw new UsernameNotFoundException("User not found: " + username);
         }
-        return user;
+        return User.withUserDetails(user).build();
     }
 
     public void addUser(UserDto dto) {
         if (users.containsKey(dto.getUsername())) {
             throw new IllegalArgumentException("User already exists: " + dto.getUsername());
         }
+
+        String encodedPassword = passwordEncoder.encode(dto.getPassword());
         UserDetails user = User.builder()
                 .username(dto.getUsername())
-                .password(passwordEncoder.encode(dto.getPassword()))
-                .roles(dto.getRoles().getFirst())
+                .password(encodedPassword)
+                .roles(dto.getRoles().toArray(new String[0]))
                 .build();
 
         users.put(dto.getUsername(), user);
