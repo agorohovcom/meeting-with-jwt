@@ -29,11 +29,11 @@ public class TestUserLoader implements CommandLineRunner {
         if (!userDetailsService.userExists("admin")) {
             userDetailsService.addUser(new UserDto(
                     "admin",
-                    "amdin123",
+                    "admin123",
                     List.of("ADMIN")
             ));
         }
 
-        log.info("✅ Test users added (user/password, admin/amdin123)");
+        log.info("✅ Test users added (user/password, admin/admin123)");
     }
 }

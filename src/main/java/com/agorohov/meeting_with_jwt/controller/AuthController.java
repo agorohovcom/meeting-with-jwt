@@ -5,6 +5,7 @@ import com.agorohov.meeting_with_jwt.dto.AuthenticationResponse;
 import com.agorohov.meeting_with_jwt.dto.RegisterRequest;
 import com.agorohov.meeting_with_jwt.dto.UserDto;
 import com.agorohov.meeting_with_jwt.service.InMemoryUserDetailsService;
+import com.agorohov.meeting_with_jwt.service.JwtTokenBlacklistService;
 import com.agorohov.meeting_with_jwt.util.JwtUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,6 +28,7 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final InMemoryUserDetailsService userDetailsService;
+    private final JwtTokenBlacklistService blacklistService;
     private final JwtUtils jwtUtils;
 
     @PostMapping("/login")
@@ -57,6 +60,15 @@ public class AuthController {
         userDetailsService.addUser(dto);
         String token = jwtUtils.generateToken(userDetailsService.loadUserByUsername(registerRequest.getUsername()));
         return ResponseEntity.ok(new AuthenticationResponse(token));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestHeader("Authorization") String authHeader) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            blacklistService.blacklistToken(token);
+        }
+        return ResponseEntity.ok("Logged out successfully");
     }
 
     // TODO что такое /refresh, /logout, /me, 2FA

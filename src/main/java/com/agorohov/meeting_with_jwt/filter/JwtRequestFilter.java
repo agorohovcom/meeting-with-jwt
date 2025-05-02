@@ -1,6 +1,7 @@
 package com.agorohov.meeting_with_jwt.filter;
 
 import com.agorohov.meeting_with_jwt.service.InMemoryUserDetailsService;
+import com.agorohov.meeting_with_jwt.service.JwtTokenBlacklistService;
 import com.agorohov.meeting_with_jwt.util.JwtUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -25,6 +26,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final InMemoryUserDetailsService userDetailsService;
+    private final JwtTokenBlacklistService blacklistService;
 
     @Override
     protected void doFilterInternal(
@@ -38,6 +40,15 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         // Извлекаем токен из заголовка
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String jwt = authHeader.substring(7);
+
+            // Проверка не отозван ли токен
+            if (blacklistService.isTokenBlacklisted(jwt)) {
+                log.warn("Token is blacklisted: {}", jwt);
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Token is invalidated (blacklisted)");
+                return;
+            }
+
             try {
                 String username = jwtUtils.extractUsername(jwt);
 
