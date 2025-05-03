@@ -82,7 +82,7 @@ public class JwtUtils {
 
     // Парсинг токена
     private Claims extractAllClaims(String token) {
-        try{
+        try {
             return Jwts.parser()
                     .verifyWith(signingKey)
                     .build()
