@@ -35,16 +35,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             @NonNull FilterChain chain)
             throws ServletException, IOException {
 
-        // Это вроде как не нужно, так как это же есть в секьюрити конфиге
-//        String path = request.getRequestURI();
-//        log.info("Processing request to: {}", path);
-//
-//        // Пропустить фильтр только для эндпоинтов авторизации, но не для логина
-//        if (path.startsWith("/api/v1/auth/login") || path.startsWith("/api/v1/auth/register")) {
-//            chain.doFilter(request, response);
-//            return;
-//        }
-
         final String authHeader = request.getHeader("Authorization");
 
         // Извлекаем токен из заголовка
@@ -53,9 +43,10 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
             // Проверка не отозван ли токен
             if (blacklistService.isTokenBlacklisted(jwt)) {
-                log.warn("Token is blacklisted: {}", jwt);
+                String msg = "Token is invalidated (blacklisted)";
+                log.warn("{}: {}", msg, jwt);
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("Token is invalidated (blacklisted)");
+                response.getWriter().write(msg);
                 return;
             }
 

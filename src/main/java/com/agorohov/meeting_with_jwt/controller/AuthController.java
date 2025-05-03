@@ -2,11 +2,14 @@ package com.agorohov.meeting_with_jwt.controller;
 
 import com.agorohov.meeting_with_jwt.dto.AuthenticationRequest;
 import com.agorohov.meeting_with_jwt.dto.AuthenticationResponse;
+import com.agorohov.meeting_with_jwt.dto.RefreshRequest;
 import com.agorohov.meeting_with_jwt.dto.RegisterRequest;
 import com.agorohov.meeting_with_jwt.dto.UserDto;
+import com.agorohov.meeting_with_jwt.dto.UserInfo;
 import com.agorohov.meeting_with_jwt.service.InMemoryUserDetailsService;
 import com.agorohov.meeting_with_jwt.service.JwtTokenBlacklistService;
 import com.agorohov.meeting_with_jwt.util.JwtUtils;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -15,8 +18,9 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -48,13 +52,43 @@ public class AuthController {
                     )
             );
 
-            String jwt = jwtUtils.generateToken((UserDetails) authentication.getPrincipal());
-            return ResponseEntity.ok(new AuthenticationResponse(jwt));
+            UserDetails ud = (UserDetails) authentication.getPrincipal();
+
+            String accessToken = jwtUtils.generateAccessToken(ud);
+            String refreshToken = jwtUtils.generateRefreshToken(ud);
+
+            return ResponseEntity.ok(new AuthenticationResponse(accessToken, refreshToken));
         } catch (BadCredentialsException e) {
             String msg = String.format("Authentication failed for %s", request.getUsername());
             log.error(msg);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(msg);
         }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody RefreshRequest request) {
+        String refreshToken = request.getRefreshToken();
+        UserDetails ud;
+        try {
+            ud = userDetailsService.loadUserByUsername(jwtUtils.extractUsername(refreshToken));
+        } catch (JwtException e) {
+            String msg = "Malformed refresh token";
+            log.error(msg);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(msg);
+        }
+
+        if (!jwtUtils.validateToken(refreshToken, ud) || blacklistService.isTokenBlacklisted(refreshToken)) {
+            String msg = "Refresh token is invalid or invalidated (blacklisted)";
+            log.error(msg);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(msg);
+        }
+
+        String newAccessToken = jwtUtils.generateAccessToken(ud);
+        String newRefreshToken = jwtUtils.generateRefreshToken(ud);
+
+        blacklistService.blacklistToken(refreshToken);
+
+        return ResponseEntity.ok(new AuthenticationResponse(newAccessToken, newRefreshToken));
     }
 
     @PostMapping("/register")
@@ -65,10 +99,28 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(msg);
         }
 
-        UserDto dto = new UserDto(registerRequest.getUsername(), registerRequest.getPassword(), List.of("USER"));
+        String username = registerRequest.getUsername();
+
+        UserDto dto = new UserDto(username, registerRequest.getPassword(), List.of("USER"));
         userDetailsService.addUser(dto);
-        String token = jwtUtils.generateToken(userDetailsService.loadUserByUsername(registerRequest.getUsername()));
-        return ResponseEntity.ok(new AuthenticationResponse(token));
+
+        UserDetails ud = userDetailsService.loadUserByUsername(username);
+
+        String accessToken = jwtUtils.generateAccessToken(ud);
+        String refreshToken = jwtUtils.generateRefreshToken(ud);
+
+        return ResponseEntity.ok(new AuthenticationResponse(accessToken, refreshToken));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> me(Authentication authentication) {
+        UserDetails ud = (UserDetails) authentication.getPrincipal();
+        return ResponseEntity.ok(new UserInfo(
+                ud.getUsername(),
+                ud.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .toList()
+        ));
     }
 
     @PostMapping("/logout")
@@ -76,10 +128,7 @@ public class AuthController {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             blacklistService.blacklistToken(token);
-            SecurityContextHolder.clearContext();
         }
         return ResponseEntity.ok("Logged out successfully");
     }
-
-    // TODO что такое /refresh, /me, 2FA
 }

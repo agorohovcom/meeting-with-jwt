@@ -7,6 +7,7 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtUtils {
@@ -23,8 +25,11 @@ public class JwtUtils {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration}")
-    private Long expiration;
+    @Value("${jwt.access.expiration.ms}")
+    private long accessExpiration;
+
+    @Value("${jwt.refresh.expiration.ms}")
+    private long refreshExpiration;
 
     private SecretKey signingKey;
 
@@ -56,14 +61,22 @@ public class JwtUtils {
         return extractExpiration(token).isBefore(Instant.now());
     }
 
-    // Сгенерировать токен для пользователя
-    public String generateToken(UserDetails userDetails) {
+    // Сгенерировать access токен для пользователя
+    public String generateAccessToken(UserDetails user) {
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, userDetails.getUsername());
+        claims.put("roles", user.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList()));
+        return createToken(claims, user.getUsername(), accessExpiration);
+    }
+
+    // Сгенерировать refresh токен для пользователя
+    public String generateRefreshToken(UserDetails user) {
+        return createToken(Map.of(), user.getUsername(), refreshExpiration);
     }
 
     // Создать токен
-    private String createToken(Map<String, Object> claims, String subject) {
+    private String createToken(Map<String, Object> claims, String subject, long expiration) {
         return Jwts.builder()
                 .claims(claims)
                 .subject(subject)
@@ -76,8 +89,11 @@ public class JwtUtils {
     // Валидация токена
     public boolean validateToken(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())
-                && !isTokenExpired(token));
+        try {
+            return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+        } catch (JwtException e) {
+            return false;
+        }
     }
 
     // Парсинг токена
