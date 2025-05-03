@@ -26,10 +26,8 @@ jwt.blacklist.cleanup.interval=<интервал очистки blacklist ток
 
 ```json
 {
-   "accessToken": <access
-   токен>,
-   "refreshToken": <refresh
-   токен>
+   "accessToken": <access токен>,
+   "refreshToken": <refresh токен>
 }
 ```
 
@@ -72,10 +70,7 @@ Authorization: Bearer <полученный ранее токен>
 
 ```json
 {
-   "refreshToken": <полученный
-   ранее
-   refresh
-   токен>
+   "refreshToken": <полученный ранее refresh токен>
 }
 ```
 
@@ -83,12 +78,8 @@ Authorization: Bearer <полученный ранее токен>
 
 ```json
 {
-   "accessToken": <новый
-   access
-   токен>,
-   "refreshToken": <новый
-   refresh
-   токен>
+   "accessToken": <новый access токен>,
+   "refreshToken": <новый refresh токен>
 }
 ```
 
@@ -124,5 +115,5 @@ Refresh token is invalid or invalidated (blacklisted)
 
 **Что не реализовано:**
 
-logout добавляет в blacklist один токен, который приходит в заголовке Authorization. Если это access токен, то он
+/logout добавляет в blacklist один токен, который приходит в заголовке Authorization. Если это access токен, то он
 блокируется, но остается refresh токен 🤷‍♂️.
