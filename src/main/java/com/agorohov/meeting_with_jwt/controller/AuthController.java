@@ -88,6 +88,7 @@ public class AuthController {
 
         blacklistService.blacklistToken(refreshToken);
 
+        log.info("Token refreshed successfully");
         return ResponseEntity.ok(new AuthenticationResponse(newAccessToken, newRefreshToken));
     }
 
@@ -109,18 +110,23 @@ public class AuthController {
         String accessToken = jwtUtils.generateAccessToken(ud);
         String refreshToken = jwtUtils.generateRefreshToken(ud);
 
+        log.info("New user registered successfully: {}", username);
         return ResponseEntity.ok(new AuthenticationResponse(accessToken, refreshToken));
     }
 
     @GetMapping("/me")
     public ResponseEntity<?> me(Authentication authentication) {
         UserDetails ud = (UserDetails) authentication.getPrincipal();
-        return ResponseEntity.ok(new UserInfo(
+        var response = ResponseEntity.ok(new UserInfo(
                 ud.getUsername(),
                 ud.getAuthorities().stream()
                         .map(GrantedAuthority::getAuthority)
+                        .map(role -> role.replaceFirst("^ROLE_", ""))
                         .toList()
         ));
+
+        log.info("User self info received: {} ", ud.getUsername());
+        return response;
     }
 
     @PostMapping("/logout")
@@ -129,6 +135,8 @@ public class AuthController {
             String token = authHeader.substring(7);
             blacklistService.blacklistToken(token);
         }
-        return ResponseEntity.ok("Logged out successfully");
+        String msg = "Logged out successfully";
+        log.info(msg);
+        return ResponseEntity.ok(msg);
     }
 }

@@ -9,5 +9,5 @@ import java.util.List;
 @AllArgsConstructor
 public class UserInfo {
     private String username;
-    private List<String> authorities;
+    private List<String> roles;
 }
